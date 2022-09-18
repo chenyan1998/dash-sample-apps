@@ -2,6 +2,15 @@ import numpy as np
 import pandas as pd
 from skimage import io, data, transform
 from time import sleep
+import itertools
+import base64
+import datetime
+import io
+import dash
+from dash.dependencies import Input, Output, State
+from dash import dcc, html, dash_table
+import pandas as pd
+import dash_bootstrap_components as dbc
 
 import dash
 from dash.exceptions import PreventUpdate
@@ -22,10 +31,19 @@ from dash_canvas.utils import (
 from registration import register_tiles
 from utils import StaticUrlPath
 import pathlib
-
+from function import averageWtp,probability,product_infor,fun_readValuation,profit_rs,price_rs,share_rs,cal_function,pricePE,sharePE,profitPE,profit_ex,price_ex,share_ex,fun_summary_results,valuation,fun_Method_Price_Experiment,cost
+from PIL import Image
+pil_image = Image.open("/Users/chenyan/Documents/GitHub/dash-sample-apps/apps/dash-stitching/assets/NUS-SIA.png")
+pil_image1 = Image.open("/Users/chenyan/Documents/GitHub/dash-sample-apps/apps/dash-stitching/assets/Ancillary.png")
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(
-    __name__, meta_tags=[{"name": "viewport", "content": "width=device-width"}]
+    __name__, external_stylesheets=[dbc.themes.BOOTSTRAP]
 )
+
+image1 = Image.open("/Users/chenyan/Documents/GitHub/dash-sample-apps/apps/dash-stitching/static/market.png")
+
+# [dbc.themes.BOOTSTRAP]
+# external_stylesheets=external_stylesheets
 server = app.server
 app.config.suppress_callback_exceptions = True
 
@@ -34,6 +52,117 @@ PATH = pathlib.Path(__file__).parent
 
 DATA_PATH = PATH.joinpath("data").resolve()
 
+product_table = pd.DataFrame()
+product_table = product_infor()
+userPrice=np.zeros(9)
+share_mdm = np.zeros(9)
+price_mdm = np.zeros(9)
+profit_mdm = np.zeros(9)
+numberOfExperiments = 30
+wtp=np.array([206.47,40.83,24.67,21.02,20.78,13.85,11.84,9.98,5.19])
+pricePE,sharePE,profitPE,profit_ex,price_ex,share_ex=fun_Method_Price_Experiment(numberOfExperiments,valuation,wtp,cost)
+wtp=np.array([206.47,40.83,24.67,21.02,20.78,13.85,11.84,9.98,5.19])
+name_list =[i+1 for i in range(len(profitPE))];
+num_list=np.zeros(len(profitPE))
+for i in range (len(profitPE)):
+    num_list[i]=profitPE[i]
+
+
+product_list = ['Fare', 'Luggage', 'NO AP','Refund', 'Miles', 'Standby', 'Meal' ,'Boarding', 'Seat']
+
+rowsep = html.Div(
+    [
+        dbc.Row(
+            [
+                dbc.Col(html.Div("Demand Distribution")),
+            ]
+        ),
+    ],style={'backgroundColor':'#ef7511','textAlign': 'center', 'color':'white'},
+)
+
+rowsep2 = html.Div(
+    [
+        dbc.Row(
+            [
+                dbc.Col(html.Div(" Human Decision."),style={'marginLeft': 4}),
+                dbc.Col(html.Div(" Mathmatical Models"),style={'marginLeft': 62}),
+                dbc.Col(html.Div("Optimazition."),style={'marginLeft': 112}),
+            ]
+        ),
+    ],style={'margin-left' : '30px','textAlign': 'center', 'color':'grey'},
+)
+
+Image_intro = html.Div(
+    [
+        dbc.Row(
+            [
+                dbc.Col(html.Div(html.Img(src=Image.open(("/Users/chenyan/Documents/GitHub/dash-sample-apps/apps/dash-stitching/static/result.png")),style={'width': '20%', 'height': '30%','margin-top': '16px'}))),
+                html.Br(),
+                html.Br(),
+                dbc.Col(html.Div(html.Img(src=Image.open(("/Users/chenyan/Documents/GitHub/dash-sample-apps/apps/dash-stitching/static/profit.png")),style={'width': '20%', 'height': '30%','margin-top': '16px'}))),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                html.Br(),
+                # 
+                dbc.Col(html.Div(html.Img(src=Image.open(("/Users/chenyan/Documents/GitHub/dash-sample-apps/apps/dash-stitching/static/price.png")),style={'width': '20%', 'height': '30%','margin-top': '16px'}))),
+            ]
+        ),
+        dbc.Row([rowsep2]),
+    ],style={'marginLeft': 122},
+)
+
+
+
+
+
+def parse_contents(contents, filename, date):
+    content_type, content_string = contents.split(',')
+
+    decoded = base64.b64decode(content_string)
+    try:
+        if 'csv' in filename:
+            # Assume that the user uploaded a CSV file
+            df = pd.read_csv(
+                io.StringIO(decoded.decode('utf-8')))
+        elif 'xls' in filename:
+            # Assume that the user uploaded an excel file
+            df = pd.read_excel(io.BytesIO(decoded))
+    except Exception as e:
+        print(e)
+        return html.Div([
+            'There was an error processing this file.'
+        ])
+
+    return html.Div([
+        html.H5(filename),
+        html.H6(datetime.datetime.fromtimestamp(date)),
+
+        dash_table.DataTable(
+            df.to_dict('records'),
+            [{'name': i, 'id': i} for i in df.columns]
+        ),
+
+        html.Hr(),  # horizontal line
+
+        # For debugging, display the raw contents provided by the web browser
+        html.Div('Raw Content'),
+        html.Pre(contents[0:200] + '...', style={
+            'whiteSpace': 'pre-wrap',
+            'wordBreak': 'break-all'
+        })
+    ])
+
+@app.callback(Output('output-data-upload', 'children'),
+              Input('upload-data', 'contents'),
+              State('upload-data', 'filename'),
+              State('upload-data', 'last_modified'))
+def update_output(list_of_contents, list_of_names, list_of_dates):
+    if list_of_contents is not None:
+        children = [
+            parse_contents(c, n, d) for c, n, d in
+            zip(list_of_contents, list_of_names, list_of_dates)]
+        return children
 
 def demo_explanation():
     # Markdown files
@@ -108,15 +237,51 @@ def instructions():
     return html.P(
         children=[
             """
-    - Choose the number of rows and columns of the mosaic
-    - Upload images
-    - Try automatic stitching by pressing the "Run stitching" button
-    - If automatic stitching did not work, adjust the overlap parameter
+    When we do pricing, the key issue is 
+    that we do not know the demand function. 
+    But we can observe the market share from price experiment. 
+    We aim to find the optimal prices to maximize total profit, 
+    after learning from these pricing experiments
     """
         ],
         className="instructions-sidebar",
     )
 
+
+accordion = html.Div(
+    dbc.Accordion(
+        [
+            dbc.AccordionItem(
+                "This is the content of the first section", title="Type 1"
+            ),
+            dbc.AccordionItem(
+                "This is the content of the second section", title="Type 2"
+            ),
+            dbc.AccordionItem(
+                "This is the content of the third section", title="Type 3"
+            ),
+        ],
+        start_collapsed=True,
+        style={'font-size': '10px','width': '330px', 'height': '120px','margin-left': '53px','textAlign': 'left',},
+    ),
+)
+
+top_card = dbc.Card(
+    [
+        dbc.CardImg(src=pil_image1, top=True),
+        html.Br(),
+        dbc.CardBody(
+            html.P("Product Structure 1", className="card-text")
+        ),
+    ],
+    style={"width": "18rem",'margin-left': '53px','width': '330px', 'height': '120px','margin-top': '16px','textAlign': 'center',},
+)
+
+cards = dbc.Row(
+    [
+        dbc.Col(top_card, width="auto"),
+    ]
+)
 
 height, width = 200, 500
 canvas_width = 800
@@ -130,10 +295,10 @@ app.layout = html.Div(
     children=[
         html.Div(
             [
-                html.Img(
-                    src=app.get_asset_url("dash-logo.png"), className="plotly-logo"
-                ),
-                html.H1(children="Stitching App"),
+                html.Img(src=pil_image, className="plotly-logo"),
+                html.Br(),
+                html.Br(),
+                html.H1(children=" Market Share Engine"),
                 instructions(),
                 html.Div(
                     [
@@ -141,9 +306,7 @@ app.layout = html.Div(
                             "LEARN MORE",
                             className="button_instruction",
                             id="learn-more-button",
-                        ),
-                        html.Button(
-                            "UPLOAD DEMO DATA", className="demo_button", id="demo"
+                            style={'width': '300px', 'height': '50%','textAlign': 'center', 'margin-bottom': '30px'}
                         ),
                     ],
                     className="mobile_buttons",
@@ -152,11 +315,14 @@ app.layout = html.Div(
                     # Empty child function for the callback
                     html.Div(id="demo-explanation", children=[])
                 ),
+
+                html.Div([dbc.Row([dbc.Col(html.Div(" Select Your Product "),style={'marginLeft': 2}),]),],style={'backgroundColor':'#08193b','textAlign': 'center', 'color':'white'},),
+
                 html.Div(
                     [
                         html.Div(
                             [
-                                html.Label("Number of rows"),
+                                html.Label("Number Of Products"),
                                 dcc.Input(
                                     id="nrows-stitch",
                                     type="number",
@@ -164,95 +330,56 @@ app.layout = html.Div(
                                     name="number of rows",
                                     min=1,
                                     step=1,
+                                    style={'width': '330px', 'height': '40%', 'margin-bottom': '30px','margin-left': '52px'}
                                 ),
                             ]
                         ),
-                        html.Div(
-                            [
-                                html.Label("Number of columns"),
-                                dcc.Input(
-                                    id="ncolumns-stitch",
-                                    type="number",
-                                    value=1,
-                                    name="number of columns",
-                                    min=1,
-                                    step=1,
-                                ),
-                            ]
-                        ),
+                        html.Label(" Products Relationships "),
+                        accordion,
+                        html.Div([
+                            html.Label("Constraints Of Products"),
+                            dcc.Dropdown(
+                                    ['C1', 'C2', 'C3'],
+                                    ['C1', 'C2'],
+                                    multi=True,
+                                    style={'width': '330px', 'height': '30%', 'margin-bottom': '20px','margin-left': '28px'}
+                                )
+                         ]),
                     ],
                     className="mobile_forms",
                 ),
                 html.Div(
                     [
-                        html.Label("Downsample factor"),
-                        dcc.RadioItems(
-                            id="downsample",
-                            options=[
-                                {"label": "1", "value": "1"},
-                                {"label": "2", "value": "2"},
-                                {"label": "4", "value": "4"},
-                                {"label": "8", "value": "8"},
-                            ],
-                            value="2",
-                            labelStyle={"display": "inline-block"},
-                            style={"margin-top": "-15px"},
-                        ),
-                        html.Label("Fraction of overlap (in [0-1] range)"),
-                        dcc.Input(
-                            id="overlap-stitch", type="number", value=0.15, min=0, max=1
-                        ),
-                        html.Br(),
-                        dcc.Checklist(
-                            id="do-blending-stitch",
-                            options=[{"label": "Blending images", "value": 1}],
-                            value=[1],
-                        ),
+                        html.Label("Products Structure "),
+                        # html.Br(),
+                        cards,
                     ],
                     className="radio_items",
                 ),
-                html.Label("Measured shifts between images"),
-                html.Div(
-                    [
-                        dash_table.DataTable(
-                            id="table-stitch",
-                            columns=columns,
-                            editable=True,
-                            style_table={
-                                "width": "81%",
-                                "margin-left": "4.5%",
-                                "border-radius": "20px",
-                            },
-                            style_cell={
-                                "text-align": "center",
-                                "font-family": "Geneva",
-                                "backgroundColor": "#01183A",
-                                "color": "#8898B2",
-                                "border": "1px solid #8898B2",
-                            },
-                        )
-                    ],
-                    className="shift_table",
-                ),
                 html.Br(),
                 html.Button(
-                    "Run stitching", id="button-stitch", className="button_submit"
+                    "Run Calculation", id="button-stitch", className="button_submit",style={'width': '310px', 'height': '50%','textAlign': 'center', 'margin-bottom': '30px',}
                 ),
                 html.Br(),
             ],
             className="four columns instruction",
         ),
+
         html.Div(
             [
                 dcc.Tabs(
                     id="stitching-tabs",
                     value="canvas-tab",
                     children=[
-                        dcc.Tab(label="IMAGE TILES", value="canvas-tab"),
-                        dcc.Tab(label="STITCHED IMAGE", value="result-tab"),
-                        dcc.Tab(label="HOW TO USE THIS APP", value="help-tab"),
+                        dcc.Tab(label="Homepage", value="home-tab",style={'backgroundColor':'#08193b','font-size': '15px'}),
+                        dcc.Tab(label="Analysis & Visualization", value="canvas-tab",style={'backgroundColor':'#08193b','font-size': '15px'}),
+                        dcc.Tab(label="Engine Simulation", value="result-tab",style={'backgroundColor':'#08193b','font-size': '15px'}),
+                        dcc.Tab(label="Engine Optimizer", value="opt-tab",style={'backgroundColor':'#08193b','font-size': '15px'}),
+                        dcc.Tab(label="Feedback", value="help-tab",style={'backgroundColor':'#08193b','font-size': '15px'}),
                     ],
                     className="tabs",
+                    style={'backgroundColor':'blue','textAlign': 'center', 'color':'white','height': '90px',
+    'width': '9200px',"margin": "24px",'margin-top': '30px','font-size': '15px'},
                 ),
                 html.Div(
                     id="tabs-content-example",
@@ -265,6 +392,7 @@ app.layout = html.Div(
                 dcc.Store(id="memory-stitch"),
             ],
             className="eight columns result",
+            # style={'backgroundColor':'#ef7511','textAlign': 'center', 'color':'white'},
         ),
     ],
     className="row twelve columns",
@@ -277,68 +405,185 @@ app.layout = html.Div(
 def fill_tab(tab):
     if tab == "canvas-tab":
         return [
-            dash_canvas.DashCanvas(
-                id="canvas-stitch",
-                width=canvas_width,
-                height=canvas_height,
-                scale=scale,
-                lineWidth=2,
-                lineColor="red",
-                tool="line",
-                hide_buttons=["pencil"],
-                image_content=array_to_data_url(
-                    np.zeros((height, width), dtype=np.uint8)
-                ),
-                goButtonTitle="Estimate translation",
-            ),
             html.Div(
                 children=[
-                    html.Div(
-                        image_upload_zone("upload-stitch", multiple=True, width="100px")
-                    )
+                    html.Div([
+                        dcc.Upload(
+                            id='upload-data',
+                            children=html.Div([
+                                'Drag and Drop or ',
+                                html.A('Select Files')
+                            ]),
+                            style={
+                                'width': '95%',
+                                'height': '60px',
+                                'lineHeight': '60px',
+                                'borderWidth': '1px',
+                                'borderStyle': 'dashed',
+                                'borderRadius': '5px',
+                                'textAlign': 'center',
+                                'margin': '30px'
+                            },
+                            # Allow multiple files to be uploaded
+                            multiple=True
+                        ),
+                        html.Div(id='output-data-upload'),
+                    ]),
                 ],
                 className="upload_zone",
                 id="upload",
             ),
         ]
+    elif tab == "home-tab":
+        # return html.Div([home_carousel])
+        return [html.Div(id="back",children=[html.Img(src=image1,style={'width': '100%', 'height': '30%'})]),html.Div(Image_intro)]
+    elif tab == "opt-tab":
+        return [html.P(['We have 9 different products', html.Br(), html.Br(), 'Fare | Luggage | NO AP | Refund | Miles | Standby | Meal | Boarding | Seat '])]
     elif tab == "result-tab":
         return [
-            dcc.Loading(
-                id="loading-1",
-                children=[
-                    html.Img(
-                        id="stitching-result",
-                        src=array_to_data_url(
-                            np.zeros((height, width), dtype=np.uint8)
-                        ),
-                        width=canvas_width,
-                    )
-                ],
-                type="circle",
-            ),
-            html.Div(
-                [
-                    html.Label("Contrast"),
-                    dcc.Slider(
-                        id="contrast-stitch", min=0, max=1, step=0.02, value=0.5
-                    ),
-                ],
-                className="result_slider",
-            ),
-            html.Div(
-                [
-                    html.Label("Brightness"),
-                    dcc.Slider(
-                        id="brightness-stitch", min=0, max=1, step=0.02, value=0.5
-                    ),
-                ],
-                className="result_slider",
-            ),
-        ]
-    return [
-        html.Img(id="bla", src=app.get_asset_url("stitch_demo.gif"), width=canvas_width)
-    ]
+                html.Div(
+                    id="bottom-column",
+                    className="twelve columns",
+                    children=[
+                        html.Div([
+                            html.H3("Input Product Price "),
+                            html.Br(),
+                            html.Br(),
+                            # 1st Col 
+                            html.Div([html.Div([html.P(['  Fare '])],style={'width': '70vh', 'height': '8vh'}),html.Div([html.P(['  Luggage'])],style={'width': '70vh', 'height': '9vh'}),html.Div([html.P(['  No AP'])],style={'width': '70vh', 'height': '2vh'}),],className="two columns"),
+                            html.Div([html.Div([dcc.Input(
+                                id='Property_name',
+                                placeholder='Fare',
+                                type='text',
+                                value='',
+                            ),]),
+                            html.Br(),
+                            html.Div([dcc.Input(
+                                id='Stree_name',
+                                placeholder='Luggage',
+                                type='text',
+                                value='',
+                            ),]),
+                            html.Br(),
+                            html.Div([dcc.Input(
+                                id='City',
+                                placeholder='No AP',
+                                type='text',
+                                value='',
+                            ),]),],className="two columns"),
 
+                            # 2nd col
+                            html.Div([html.Div([html.P(['Refund '])],style={'width': '70vh', 'height': '8vh'}),html.Div([html.P(['Miles '])],style={'width': '70vh', 'height': '8vh'}),html.Div([html.P(['Standby'])],style={'width': '70vh', 'height': '8vh'}),],className="two columns"),
+                            html.Div([html.Div([dcc.Input(
+                                id='Zip_code',
+                                placeholder='Refund',
+                                type='text',
+                                value='',
+                            ),]),
+                            html.Br(),
+                            html.Div([dcc.Input(
+                                id='Country',
+                                placeholder='Miles',
+                                type='text',
+                                value='',
+                            ),]),
+                            html.Br(),
+                            html.Div([dcc.Input(
+                                id='V6',
+                                placeholder='Standby',
+                                type='text',
+                                value='',
+                            ),]),],className="two columns"),
+
+                            # 3rd Col 
+                            html.Div([html.Div([html.P(['Meal '])],style={'width': '70vh', 'height': '8vh'}),html.Div([html.P(['Boarding '])],style={'width': '70vh', 'height': '8vh'}),html.Div([html.P(['Seat'])],style={'width': '70vh', 'height': '8vh'}),],className="two columns"),
+                            html.Div([
+                            html.Div([dcc.Input(
+                                id='V7',
+                                placeholder='Meal',
+                                type='text',
+                                value='',
+                            ),]),
+                            html.Br(),
+                            html.Div([dcc.Input(
+                                id='V8',
+                                placeholder='Boarding',
+                                type='text',
+                                value='',
+                            ),]),
+                            html.Br(),
+                            html.Div([dcc.Input(
+                                id='V9',
+                                placeholder='Seat',
+                                type='text',
+                                value='',
+                            ),]),],className="two columns"),
+                            
+                            
+                            
+                            html.Br(),
+                            html.Br(),
+                            html.Br(),
+                            html.Br(),
+                            html.Br(),
+                            html.Div(id='address'),
+                        ]),
+
+                        html.Div([html.Br(),html.Button(id='Submit_address', n_clicks=0, children='Submit')],className="twelve columns",style={'margin-left': '550px',
+                                 'margin-bottom': '10px',
+                                 'verticalAlign': 'middle',
+                                 'color':"secondary",}),
+                
+            ],
+        ),
+        ]
+    # help-Tab 
+    return [html.P(['We have 9 different products', html.Br(), html.Br(), 'Fare | Luggage | NO AP | Refund | Miles | Standby | Meal | Boarding | Seat '])]
+
+
+
+@app.callback(
+    [Output('address', 'children')],
+    [Input('Submit_address', 'n_clicks')],
+    [State('Property_name', 'value'),
+     State('Stree_name', 'value'),
+     State('City', 'value'),
+     State('Zip_code', 'value'),
+     State('Country', 'value')])
+
+def update_map(n_clicks,fare, luggage, NoAP, Refund,Miles):
+    inputlis = [list({fare}),list({luggage}),list({NoAP}),list({Refund}),list({Miles}),[0],[1],[1],[1]]
+    v1 = list({fare})
+    ab = itertools.chain(list({fare}), list({luggage}),list({NoAP}),list({Refund}),list({Miles}),['2'], ['3'],['2'], ['3'])
+    ab = list(ab)
+    ab = list(map(int, ab))
+
+    # summary 
+    summary,sumresult=fun_summary_results(9,price_rs,share_rs,profit_rs,price_ex,share_ex,profit_ex,price_mdm,share_mdm,profit_mdm)
+    lst = [['Price - Random Search'],['Share - Random Search'],['Price - Experiment Best'],['Share - Experiment Best'],['Price - MDM'],['Share - MDM']]
+    sumresult.insert(loc=0, column='RowName', value=lst)
+    df = pd.DataFrame(sumresult, columns =['RowName','Fare', 'Luggage', 'No AP','Refund','Miles','Standby','Meal','Boarding','Seat','Total Profit'])
+
+    result = cal_function(ab,pricePE,sharePE,profitPE)
+    return [html.Div(f"User Share: {result[0]}"),html.Div(f"User Profit: {result[1]}"),html.Div(f"price_ex: {result[2]}"),html.Div(f"profit_ex: {result[3]}"),html.Div(f"share_ex: {result[4]}"),html.Div(f"numberOfExperiments: {result[5]}"),html.Div(f" Summary Table : "),dash_table.DataTable(
+            id="t1",
+            data=df.to_dict('records'),
+            columns=[
+                {'name': i, 'id': i} for i in df.columns
+            ],
+            fixed_rows={ 'headers': True, 'data': 0 },
+            style_as_list_view=True,
+            style_cell={
+                'padding': '5px',
+                'border': '1px solid black'},
+            style_header={
+                'backgroundColor': 'white',
+                'fontWeight': 'bold',
+                'border': '1px solid black'
+            },
+            virtualization=True,
+            page_action='none'
+            )],
 
 @app.callback(Output("stitching-tabs", "value"), [Input("button-stitch", "n_clicks")])
 def change_focus(click):
